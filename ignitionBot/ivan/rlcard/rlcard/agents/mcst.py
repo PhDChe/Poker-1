@@ -7,7 +7,9 @@ import numpy as np
 import psutil
 import random
 import copy
-# import ray
+import collections
+import ray
+import math
 import numpy as np
 import time
 from rlcard.agents import DQNAgentPytorch as DQNAgent
@@ -46,9 +48,14 @@ class Node:
         #     s = sorted(self.childNodes, key = lambda c: (1 - c.wins/c.visits) + 2*m[c.move[0]]*sqrt(log(self.visits)/(c.visits)))
 
     
+        
+        
+        
         # Smooth-UCT Algorithm
-        # 12.5% of the time use UCT; 87.5% avg choice
-        param = .1
+        # ~25% of the time use UCT; ~75% avg choice
+
+
+        param = .125
                 
         nk = max(param, 1/(1 + sqrt(self.visits)))
         if (random.random() < nk):
@@ -121,7 +128,7 @@ class Node:
         return s
 
 
-# @ray.remote
+@ray.remote
 def par_UCT(rootstate, itermax, verbose = False):
     
     rootnode = Node(state = rootstate)
@@ -176,16 +183,16 @@ class MCTS():
             Return the best move from the rootstate.
             Assumes 2 alternating players (player 1 starts), with game results in the range [0.0, 1.0]."""
         # batches = processes//(self.processors)
-        # ret = copy.deepcopy(ray.get(ray.wait([par_UCT.remote(rootstate, itermax//processes, verbose = verbose) for x in range(processes)], num_returns=processes)[0]))
+        ret = copy.deepcopy(ray.get(ray.wait([par_UCT.remote(rootstate, itermax//processes, verbose = verbose) for x in range(processes)], num_returns=processes)[0]))
         # for i in range(batches): 
-        #     i = ray.wait([self.processes[x].par_UCT.remote(rootstate, itermax//processes, verbose = verbose) for x in range(self.processors)], num_returns=self.processors)
+        #     i = ray.wait([processes[x].par_UCT.remote(rootstate, itermax//processes, verbose = verbose) for x in range(self.processors)], num_returns=self.processors)
         #     ret += copy.deepcopy(ray.get(i[0]))
-        ret = [par_UCT(rootstate, itermax, verbose = verbose)]
+        # ret = [par_UCT(rootstate, itermax, verbose = verbose)]
 
-        a = [0, 0, 0, 0, 0, 0]
+        a = [0, 0, 0, 0, 0, 0, 0]
         for i in range(len(ret)):
             for j in range(len(ret[i])):
-                a[ret[i][j].move[0]] += ret[i][j].visits
+                a[ret[i][j].move] += ret[i][j].visits
 #        print(np.array([a[i]/sum(a) for i in range(len(a))]), 'what the ')
         print(a)
         return a.index(max(a)), np.array([a[i]/sum(a) for i in range(len(a))])
@@ -409,17 +416,18 @@ class PokerState:
         self.pot = pot
         self.invested = [a_invested, b_invested]
         self.opp_hand = None
+        self.to_play = 1
         # print('---------------------------------------------- ', curr_pot_diff)
         # self.moves_taken = [(1, 5), (1, 3)]
         # assume raise
-        self.moves_taken = [(1, a_invested), (2, b_invested)]
+        self.moves_taken = [1, 2]
 
         if self._get_pot_difference() == 0:
             #last person either called or checked; assume call. whatever the case we are in the next game state
             if(a_invested == 10):
-                self.moves_taken = [(3, a_invested), (1, b_invested)]
+                self.moves_taken = [3, 1]
             else:
-                self.moves_taken = [(4, a_invested), (3, b_invested)]
+                self.moves_taken = [4, 3]
 
         
 
@@ -433,8 +441,10 @@ class PokerState:
 
         ps.playerJustMoved = self.playerJustMoved
         ps.upState()
-        return copy.deepcopy(self)
-        #return ps
+    
+
+        # return copy.deepcopy(self)
+        return ps
 
     def upState(self):
         self.state = {'obs': [0]*54}
@@ -447,55 +457,64 @@ class PokerState:
         self.state['obs'][53] = self.invested[1]
         self.state['cur'] = ((self.playerJustMoved+1)%2)
         self.state['stage'] = self._get_stage_num()
-        self.state['legal_actions'] = []
-        for i in self.get_moves():
-            self.state['legal_actions'].append(i[0])
+        self.state['legal_actions'] = self.get_moves()
+        # for i in self.get_moves():
+        #     self.state['legal_actions'].append(i)
         # print(self.state)
 
     def do_move(self, move):
         #self.moves_taken += [move]
         player = self._get_player_turn()
         diff = self._get_pot_difference()
-        
+        temp = self.clone()
         # print(move, diff)
-        if(move[0] == 0):
-            self.moves_taken += [(0, 0)]
-        elif move[0] == 1 or move[0] == 2:
+        if(move == 0):
+            self.moves_taken += [0]
+        elif move == 1 or move == 2:
             # if 2 is all in, make sure diff is only equal to his stack amt
             if (diff > self.credits[player]):
                 self.pot += self.credits[player]
-                self.moves_taken += [(move[0], self.credits[player])]
+                self.moves_taken += [move]
                 self.invested[player] += self.credits[player]
                 self.credits[player] = 0
             else:
-                self.moves_taken += [(move[0], diff)]
+                self.moves_taken += [move]
                 self.pot += diff
                 self.invested[player] += diff
                 self.credits[player] -= diff
         
-        elif move[0] == 3:
+        elif move == 3:
+            self.moves_taken += [move]
+            self.pot += 30
+            self.invested[player] += 30
+            self.credits[player] = self.credits[player] - 30
+
+        elif move == 4:
             self.credits[player] -= (self.pot//2)
             self.invested[player] += (self.pot//2)
-            self.moves_taken += [(move[0], self.pot//2)]
+            self.moves_taken += [move]
             self.pot += (self.pot//2)
-        elif move[0] == 4:
+        
+        elif move == 5:
             self.credits[player] -= (self.pot)
             self.invested[player] += (self.pot)
-            self.moves_taken += [(move[0], self.pot)]
+            self.moves_taken += [move]
             self.pot += (self.pot)
 
-        elif move[0] == 5:
-            self.moves_taken += [(move[0], self.credits[player])]
+        
+            
+        elif move == 6:
+            self.moves_taken += [move]
             self.pot += self.credits[player]
             self.invested[player] += self.credits[player]
             self.credits[player] = 0
-            
         
         # print(self.moves_taken)
 
         
         self.playerJustMoved = (self.playerJustMoved + 1) % 2
-        self.upState()
+        self.upState
+        return temp
 
     def get_moves(self):
         if self._get_folded() != -1 or self._get_stage_num() == 5 or self.credits[self._get_player_turn()] == 0:
@@ -510,31 +529,36 @@ class PokerState:
         # action_names = ['fold', 'check', 'call', 'raise half-pot', 'raise pot', 'all-in']
         
 
-        actions = [(0, 0), (1, 0), (2, diff), (3, pot//2), (4, pot), (5, self.credits[player])]
+        actions = [0, 1, 2, 3, 4, 5, 6]
 
 
         if diff > 0:
-            actions.remove((1, 0))
+            actions.remove(1)
 
         if diff == 0:
-            actions.remove((2, diff))
+            actions.remove(2)
         
+        if 30 >= self.credits[player] or 30 == diff:
+            actions.remove(3)
+
         if pot >= self.credits[player] or pot == diff:
-            actions.remove((4, pot))
+            actions.remove(5)
         
         if pot // 2 >= self.credits[player] or pot//2 == diff:
-            actions.remove((3, pot//2))
+            actions.remove(4)
 
         if diff > 0 and self.invested[player] + diff >= self.credits[player]:
-            actions = [(0, 0), (2, self.credits[player])]
+            actions = [0, 2]
             if (self.credits[player] > 0 and self.credits[(player+1)%2] > 0):
-                actions.append((5, self.credits[player]))
+                actions.append(6)
+
+        # print(actions)
 
         return actions
 
 
     def get_result(self, playerjm):
-        chips = 250
+        chips = 1000
         if self._get_folded() == playerjm:
             return (chips-self.invested[playerjm])/chips # 0 # -log(self.invested[playerjm]) # 0 #-self.invested[playerjm] # return   # 0
         elif self._get_folded() == (playerjm + 1) % 2:
@@ -543,6 +567,13 @@ class PokerState:
             # evaluate
             if self.opp_hand is None:
                 self.opp_hand = []
+
+
+
+                # HAVE IT CHOOSE A HAND ACCORDING TO THE NARROWED APPONENT RANGE
+
+
+
                 while len(self.opp_hand) < 2:
                     c = cardsDict[random.randrange(52)]
                     if not c in self.hand + self.community_cards + self.opp_hand:
@@ -575,24 +606,25 @@ class PokerState:
         return len(self.moves_taken) % 2
 
     def _get_folded(self):
-        if len(self.moves_taken) == 0 or self.moves_taken[-1][0] != 0:
+        if len(self.moves_taken) == 0 or self.moves_taken[-1] != 0:
             return -1
         else:
             return (len(self.moves_taken) + 1) % 2
 
     def _get_pot_difference(self):
-        sums = [0, 0]
+        # sums = [0, 0]
 
-        for i in range(1, len(self.moves_taken) + 1):
-            sums[-i % 2] += self.moves_taken[-i][1]
-        return abs(sums[0] - sums[1])
+        # for i in range(1, len(self.moves_taken) + 1):
+        #     sums[-i % 2] += self.moves_taken[-i]
+
+        return abs(self.invested[0] - self.invested[1])
 
     def _get_stage_num(self):
         num = 0
         consecutive_check = 0
 
         for move in self.moves_taken:
-            if move[0] == 1:
+            if move == 1:
                 if consecutive_check == 1:
                     num += 1
                     consecutive_check = 0
@@ -600,7 +632,7 @@ class PokerState:
                     consecutive_check = 1
             else:
                 consecutive_check = 0
-                if move[0] == 2:
+                if move == 2:
                     num += 1
 
         return num

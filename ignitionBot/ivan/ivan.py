@@ -81,13 +81,13 @@ def nfsp():
                             q_train_every=train_every//2,
                             q_mlp_layers=[512,512]))
 
-    check_point_path = os.path.join('models\\nolimit_holdem_nfsp\\1v1MCNFSPv3\\cp\\10')
+    # check_point_path = os.path.join('models\\nolimit_holdem_nfsp\\1v1MCNFSPv3\\cp\\10')
     print('-------------------------------------------------------------------------------------')
-    print(check_point_path)
+    # print(check_point_path)
     with sess.as_default():
         with graph.as_default():
             saver = tf.train.Saver()
-            saver.restore(sess, tf.train.latest_checkpoint(check_point_path))
+            # saver.restore(sess, tf.train.latest_checkpoint(check_point_path))
     
             global_step = tf.Variable(0, name='global_step', trainable=False)
             random_agent = RandomAgent(action_num=eval_env2.action_num)

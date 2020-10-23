@@ -34,7 +34,7 @@ def nfsp():
     memory_init_size = 1000
 
     # The paths for saving the logs and learning curves
-    log_dir = './experiments/nolimit_holdem_nfsp_result/iiivan'
+    log_dir = './experiments/nolimit_holdem_nfsp_result/no_all_in'
 
     # Set a global seed
     set_global_seed(477)
@@ -175,7 +175,7 @@ def nfsp():
                     logger.log('\n\n----------------------------------------------------------------')
                     
                 if episode % (evaluate_every) == 0 and not episode == 0:
-                    save_dir = 'models/nolimit_holdem_nfsp/iiivan/cp/'+str(episode//evaluate_every)
+                    save_dir = 'models/nolimit_holdem_nfsp/no_all_in/cp/'+str(episode//evaluate_every)
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
                     saver = tf.train.Saver()
@@ -193,7 +193,7 @@ def nfsp():
             logger.plot('NFSP')
             
             # Save model
-            save_dir = 'models/nolimit_holdem_nfsp/iiivan'
+            save_dir = 'models/nolimit_holdem_nfsp/no_all_in'
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
             saver = tf.train.Saver()
@@ -267,7 +267,7 @@ def play():
                             q_mlp_layers=[512,512],
                             evaluate_with='best_response'))
 
-    check_point_path = os.path.join('models/nolimit_holdem_nfsp/iiivan/cp/10/')
+    check_point_path = os.path.join('models/nolimit_holdem_nfsp/no_all_in/cp/9/')
     print('-------------------------------------------------------------------------------------')
     print(check_point_path)
     with sess.as_default():
@@ -334,5 +334,5 @@ def play():
 
 
 
-#nfsp()
-play()
+nfsp()
+# play()

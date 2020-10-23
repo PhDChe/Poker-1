@@ -35,7 +35,7 @@ class NolimitholdemGame(Game):
 
         # config players
         self.num_players = num_players
-        self.init_chips = 250
+        self.init_chips = 1000
 
     def init_game(self):
         ''' Initialilze the game of Limit Texas Hold'em

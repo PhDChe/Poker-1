@@ -11,11 +11,11 @@ class Action(Enum):
     FOLD = 0
     CHECK = 1
     CALL = 2
-    # RAISE_3BB = 3
-    RAISE_HALF_POT = 3
-    RAISE_POT = 4
+    RAISE_3BB = 3
+    RAISE_HALF_POT = 4
+    RAISE_POT = 5
     # RAISE_2POT = 5
-    ALL_IN = 5
+    ALL_IN = 6
     # SMALL_BLIND = 7
     # BIG_BLIND = 8
 
@@ -77,6 +77,15 @@ class NolimitholdemRound():
             self.raised[self.game_pointer] = max(self.raised)
             player.bet(chips=diff)
             self.not_raise_num += 1
+
+        elif action == Action.RAISE_3BB:
+            
+            # THIS WILL NEED TO BE ADJUSTED DEPENDING ON THE NUMBER OF BIGBLINDS IN THE GAME
+            quantity = 30
+            self.raised[self.game_pointer] += quantity
+            self.dealer.pot += quantity
+            player.bet(chips=quantity)
+            self.not_raise_num = 1
 
         elif action == Action.ALL_IN:
             all_in_quantity = player.remained_chips
@@ -145,6 +154,9 @@ class NolimitholdemRound():
 
         if int(self.dealer.pot / 2) >= player.remained_chips or self.dealer.pot//2 == players[(self.game_pointer + (self.num_players - 1)) % self.num_players].in_chips - player.in_chips:
             full_actions.remove(Action.RAISE_HALF_POT)
+
+        if int(30) >= player.remained_chips or 30 == players[(self.game_pointer + (self.num_players - 1)) % self.num_players].in_chips - player.in_chips:
+            full_actions.remove(Action.RAISE_3BB)
 
         # If the current player has no more chips after call, we cannot raise
         diff = max(self.raised) - self.raised[self.game_pointer]

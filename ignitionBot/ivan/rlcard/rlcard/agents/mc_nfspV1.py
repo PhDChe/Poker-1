@@ -227,10 +227,11 @@ class NFSPAgent(object):
         obs = state['obs']
         legal_actions = state['legal_actions']
 
-        
+        par = mcst.MCTS(1)
         if self._mode == MODE.best_response:
             probs = self._rl_agent.predict(obs)
-            m = mcst.UCT(rootstate = stt, itermax = 100000, processors = 64, verbose = False)
+            m = par.UCT(rootstate = stt, itermax = 50000, processes = 16, verbose = False)
+            m = m[0]
             probs[m] += 1
             probs = remove_illegal(probs, legal_actions)
             probs /= sum(probs)
@@ -280,24 +281,27 @@ class NFSPAgent(object):
 
         hand = [x for x in hand if x not in tab]
         stt = mcst.PokerState(hand, tab, state['cur'], state['opp'], abs(state['obs'][-2] - state['obs'][-1]), state['obs'][-2] + state['obs'][-1], state['obs'][52], state['obs'][53])
+        par = mcst.MCTS(1)
         # print(state)
         if self.evaluate_with == 'best_response':
             action, probs = self._rl_agent.eval_step(state)
-            m = mcst.UCT(rootstate = stt, itermax = 100000, processors = 64, verbose = False)
+            m = par.UCT(rootstate = stt, itermax = 100000, processes = 32, verbose = False)
             print(m, probs)
-            if probs[1] == probs[3] and probs[3] == probs[4] and probs[4] == probs[5]:
-                probs[2] /= 25
-                probs[m] += 2
+            m = m[0]
+            probs[m] += 1
+            # if probs[1] == probs[3] and probs[3] == probs[4] and probs[4] == probs[5]:
+            #     probs[2] /= 25
+            #     probs[m] += 2
             
-            elif not m == 5:
-                probs[m] += 2
-            else:
-                probs[4] += 3
+            # elif not m == 5:
+            #     probs[m] += 2
+            # else:
+            #     probs[4] += 3
             
-            if(len(tab) == 0):
-                probs[5] = 0
-            else:
-                probs[5] /= 4
+            # if(len(tab) == 0):
+            #     probs[5] = 0
+            # else:
+            #     probs[5] /= 4
             
             probs = remove_illegal(probs, legal_actions)
             probs /= sum(probs)
